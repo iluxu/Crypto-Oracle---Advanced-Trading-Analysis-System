@@ -1,0 +1,48 @@
+# Core dependencies
+numpy>=1.19.0
+pandas>=1.3.0
+python-dotenv>=0.19.0
+requests>=2.25.0
+aiohttp>=3.8.0
+asyncio>=3.4.3
+
+# Exchange connectivity
+ccxt>=2.0.0
+
+# Machine Learning
+tensorflow>=2.8.0
+scikit-learn>=1.0.0
+arch>=5.0.0  # For GARCH models
+
+# API 
+fastapi>=0.78.0
+uvicorn[standard]>=0.17.0
+pydantic>=1.9.0
+
+# Technical Analysis
+ta>=0.9.0  # Python Technical Analysis library
+# Note: TA-Lib is optional but recommended for faster calculation
+# Install instructions: https://github.com/mrjbq7/ta-lib#installation
+
+# GPT Integration
+openai>=1.0.0
+
+# Data visualization (for notebooks/reports)
+matplotlib>=3.5.0
+seaborn>=0.11.0
+plotly>=5.3.0
+
+# Sentiment Analysis
+textblob>=0.15.3
+vaderSentiment>=3.3.2
+
+# Utilities
+tqdm>=4.62.0  # Progress bars
+joblib>=1.1.0  # Parallelization and caching
+pytz>=2021.3  # Timezone handling
+python-dateutil>=2.8.2
+websockets>=10.0  # For real-time data connections
+
+# Testing
+pytest>=7.0.0
+pytest-asyncio>=0.18.0
