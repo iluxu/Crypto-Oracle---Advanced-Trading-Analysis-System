@@ -1,5 +1,74 @@
-if API_AVAILABLE:
-    # Create FastAPI application
+import os
+import pandas as pd
+import numpy as np
+import time
+import asyncio
+import logging
+import warnings
+import json
+import re
+import ccxt
+import sys
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional, Tuple, Union, Set
+import traceback
+import requests
+
+#################################################
+# CONFIGURATION
+#################################################
+
+# Default LSTM model parameters
+LSTM_TIME_STEPS = 60
+LSTM_EPOCHS = 15
+LSTM_BATCH_SIZE = 64
+
+# Default GARCH model parameters
+GARCH_P = 1
+GARCH_Q = 1
+
+# Backtesting parameters
+MAX_TRADES_PER_BACKTEST = 100
+MAX_TRADE_DURATION_BARS = 96  # Max holding period (e.g., 4 days on 1h timeframe)
+
+# Concurrency limits
+DEFAULT_MAX_CONCURRENT_TASKS = 5  # For scanning
+
+# Portfolio management defaults
+MAX_POSITIONS = 5
+DEFAULT_RISK_PER_TRADE = 0.02  # 2% risk per trade
+DEFAULT_ACCOUNT_BALANCE = 10000  # Default account balance in USD
+
+# Timeframes to analyze (multi-timeframe analysis)
+DEFAULT_TIMEFRAMES = ["1h", "4h", "1d"]
+PRIMARY_TIMEFRAME = "1h"  # Primary timeframe for signals
+
+# Sentiment & on-chain metrics
+ENABLE_SENTIMENT = os.getenv("ENABLE_SENTIMENT", "false").lower() in ('true', '1', 'yes')
+ENABLE_ONCHAIN = os.getenv("ENABLE_ONCHAIN", "false").lower() in ('true', '1', 'yes')
+
+# API keys for external services
+CRYPTOWATCH_API_KEY = os.getenv("CRYPTOWATCH_API_KEY", "")
+CRYPTOQUANT_API_KEY = os.getenv("CRYPTOQUANT_API_KEY", "")
+GLASSNODE_API_KEY = os.getenv("GLASSNODE_API_KEY", "")
+TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN", "")
+CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
+
+
+API_AVAILABLE = False
+try:
+    from fastapi import FastAPI, HTTPException, Body, Query, Path, Depends, BackgroundTasks
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    import uvicorn
+    API_AVAILABLE = True
+except ImportError as e:
+    API_AVAILABLE = False
+    print("FastAPI is not installed. API features will be disabled:", e)
+    
+    
+if API_AVAILABLE:    
+   # Create FastAPI application
     app = FastAPI(
         title="Crypto Oracle API",
         description="Advanced cryptocurrency analysis and trading strategy generation",
@@ -139,7 +208,7 @@ if API_AVAILABLE:
         
         except Exception as e:
             log.error(f"Error in analyze endpoint: {e}", exc_info=True)
-            raise HTTPException(status# -*- coding: utf-8 -*-
+            raise HTTPException(status)
 """
 Crypto Oracle - Enhanced Trading Analysis System
 ================================================
@@ -160,21 +229,7 @@ Author: CryptoOracle
 Version: 2.0.0
 """
 
-import os
-import pandas as pd
-import numpy as np
-import time
-import asyncio
-import logging
-import warnings
-import json
-import re
-import ccxt
-import sys
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple, Union, Set
-import traceback
-import requests
+
 from collections import defaultdict
 
 # Suppress warnings
@@ -200,6 +255,9 @@ try:
     log.info("Environment variables loaded from .env file")
 except ImportError:
     log.warning("python-dotenv not installed. Using environment variables directly.")
+
+
+
 
 #################################################
 # TECHNICAL ANALYSIS MODULES
@@ -250,7 +308,7 @@ except ImportError as e:
 # Import OpenAI
 try:
     import openai
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+    OPENAI_API_KEY = ""
     if OPENAI_API_KEY:
         openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
         log.info("OpenAI client initialized")
@@ -284,45 +342,7 @@ except ImportError:
     TALIB_AVAILABLE = False
     log.warning("TA-Lib not installed. Using custom indicator implementations.")
 
-#################################################
-# CONFIGURATION
-#################################################
 
-# Default LSTM model parameters
-LSTM_TIME_STEPS = 60
-LSTM_EPOCHS = 15
-LSTM_BATCH_SIZE = 64
-
-# Default GARCH model parameters
-GARCH_P = 1
-GARCH_Q = 1
-
-# Backtesting parameters
-MAX_TRADES_PER_BACKTEST = 100
-MAX_TRADE_DURATION_BARS = 96  # Max holding period (e.g., 4 days on 1h timeframe)
-
-# Concurrency limits
-DEFAULT_MAX_CONCURRENT_TASKS = 5  # For scanning
-
-# Portfolio management defaults
-MAX_POSITIONS = 5
-DEFAULT_RISK_PER_TRADE = 0.02  # 2% risk per trade
-DEFAULT_ACCOUNT_BALANCE = 10000  # Default account balance in USD
-
-# Timeframes to analyze (multi-timeframe analysis)
-DEFAULT_TIMEFRAMES = ["1h", "4h", "1d"]
-PRIMARY_TIMEFRAME = "1h"  # Primary timeframe for signals
-
-# Sentiment & on-chain metrics
-ENABLE_SENTIMENT = os.getenv("ENABLE_SENTIMENT", "false").lower() in ('true', '1', 'yes')
-ENABLE_ONCHAIN = os.getenv("ENABLE_ONCHAIN", "false").lower() in ('true', '1', 'yes')
-
-# API keys for external services
-CRYPTOWATCH_API_KEY = os.getenv("CRYPTOWATCH_API_KEY", "")
-CRYPTOQUANT_API_KEY = os.getenv("CRYPTOQUANT_API_KEY", "")
-GLASSNODE_API_KEY = os.getenv("GLASSNODE_API_KEY", "")
-TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN", "")
-CRYPTOCOMPARE_API_KEY = os.getenv("CRYPTOCOMPARE_API_KEY", "")
 
 #################################################
 # SENTIMENT ANALYSIS & SOCIAL DATA
@@ -1375,7 +1395,7 @@ class Position:
         """Convert position to dictionary"""
         return {
             'symbol': self.symbol,
-            
+            }
 
 def initialize_exchange():
     """Initialize the exchange client with proper error handling"""
@@ -2446,13 +2466,16 @@ async def scan_market(
                 raise ConnectionError("Failed to load markets for scanning")
         
         # Get available symbols (focus on USDT futures)
+        # Get available symbols (focus on USDT futures)
         all_symbols = []
         for symbol_info in exchange_client.markets.values():
             if (symbol_info.get('active') and 
-                symbol_info.get('quote') == 'USDT' and 
-                symbol_info.get('swap', False) and  # Perpetual swaps/futures
-                symbol_info.get('future', False)):
+                symbol_info.get('quote') == 'USDT' and
+                symbol_info.get('settle') == 'USDT' and  # USDT settlement
+                symbol_info.get('swap', False)):         # Perpetual swaps/futures
                 all_symbols.append(symbol_info['symbol'])
+
+        all_symbols = sorted(all_symbols)  # Sort for consistency
         
         if not all_symbols:
             raise ValueError("No active symbols found for scanning")
